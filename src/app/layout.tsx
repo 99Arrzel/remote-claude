@@ -1,5 +1,14 @@
 import './globals.css'
 import type { ReactNode } from 'react'
+import { getDb } from '@/lib/db'
+import { reconcileActiveSessions } from '@/lib/startup'
+
+let reconciled = false
+async function ensureReconciled() {
+  if (reconciled) return
+  reconciled = true
+  await reconcileActiveSessions(getDb())
+}
 
 export const metadata = {
   title: 'Remote Claude',
@@ -13,7 +22,8 @@ export const viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  await ensureReconciled()
   return (
     <html lang="en">
       <body className="bg-zinc-950 text-zinc-50 min-h-screen">{children}</body>
