@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { orpcClient } from '@/lib/orpc/client'
 import type { ClaudeSession } from '@/lib/orpc/claude-sessions-logic'
@@ -57,6 +57,45 @@ function LoadingSpinner() {
       <p className="text-sm text-zinc-500">Loading sessions…</p>
     </div>
   )
+}
+
+function useNotifications() {
+  const permissionRef = useRef<NotificationPermission>('default')
+
+  useEffect(() => {
+    if (typeof Notification === 'undefined') return
+    permissionRef.current = Notification.permission
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then(p => { permissionRef.current = p })
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function subscribe() {
+      while (!cancelled) {
+        try {
+          const stream = await orpcClient.notifications.stream({})
+          for await (const event of stream) {
+            if (cancelled) break
+            if (event.type === 'session_idle' && permissionRef.current === 'granted') {
+              new Notification('Claude is ready', {
+                body: event.sessionName,
+                tag: `idle-${event.sessionId}`,
+              })
+            }
+          }
+        } catch {
+          // Connection lost — retry after delay
+          if (!cancelled) await new Promise(r => setTimeout(r, 3000))
+        }
+      }
+    }
+
+    subscribe()
+    return () => { cancelled = true }
+  }, [])
 }
 
 function ClaudeSessionCard({
@@ -143,6 +182,8 @@ export function SessionDashboard({ initialHome }: { initialHome: string }) {
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  useNotifications()
+
   const fetchSessions = useCallback(async () => {
     try {
       const [claude, active] = await Promise.all([
@@ -160,7 +201,7 @@ export function SessionDashboard({ initialHome }: { initialHome: string }) {
 
   useEffect(() => {
     fetchSessions()
-    const interval = setInterval(fetchSessions, 30_000)
+    const interval = setInterval(fetchSessions, 10_000)
     window.addEventListener('focus', fetchSessions)
     return () => {
       clearInterval(interval)

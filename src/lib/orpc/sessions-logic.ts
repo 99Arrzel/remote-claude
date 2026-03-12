@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { eq, desc, asc, and, gte } from 'drizzle-orm'
 import { sessions, sessionOutput, type Session } from '../db/schema'
 import type { getDb } from '../db'
-import { ptyManager, sessionPublisher, type SessionEvent, type PtyHandle } from '../pty/manager'
+import { ptyManager, sessionPublisher, type SessionEvent, type PtyHandle, trackSessionName, markSessionActive, clearActivityTimer } from '../pty/manager'
 
 type Db = ReturnType<typeof getDb>
 
@@ -77,6 +77,7 @@ export async function createSession(
 
   // 4. Track in manager
   manager.set(id, { pty: ptyProcess, seq: 0 })
+  trackSessionName(id, input.name)
 
   // 5. onData: write to DB synchronously THEN publish
   ptyProcess.onData((data) => {
@@ -86,6 +87,7 @@ export async function createSession(
       .values({ sessionId: id, seq, type: 'output', data, createdAt: Date.now() })
       .run()
     sessionPublisher.publish(id, { type: 'output', seq, data })
+    markSessionActive(id, data.length)
   })
 
   // 6. onExit: write sentinel, update status, clean up
@@ -101,6 +103,7 @@ export async function createSession(
     }
     db.update(sessions).set({ status: 'exited', updatedAt: Date.now() }).where(eq(sessions.id, id)).run()
     manager.delete(id)
+    clearActivityTimer(id)
     sessionPublisher.publish(id, { type: 'exit', seq, data: '' })
   })
 
