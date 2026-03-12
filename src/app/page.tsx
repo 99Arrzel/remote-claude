@@ -1,3 +1,6 @@
-export default function Page() {
-  return <div className="p-8 text-2xl font-bold text-emerald-400">Remote Claude</div>
+import { SessionDashboard } from '@/components/session-dashboard'
+
+export default function HomePage() {
+  const home = process.env.HOME ?? '/'
+  return <SessionDashboard initialHome={home} />
 }
