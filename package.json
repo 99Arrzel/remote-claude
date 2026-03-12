@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "bun ./node_modules/next/dist/bin/next start",
     "db:migrate": "bun src/lib/db/migrate.ts",
     "db:generate": "bun drizzle-kit generate"
   },

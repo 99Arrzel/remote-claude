@@ -2,8 +2,10 @@ import type { NextConfig } from 'next'
 import withPWA from 'next-pwa'
 
 const nextConfig: NextConfig = {
-  // node-pty is a native module — must stay server-side only
-  serverExternalPackages: ['node-pty'],
+  // Native/Bun-specific modules — must stay server-side only and not be bundled
+  serverExternalPackages: ['node-pty', 'bun:sqlite'],
+  // Silence Turbopack warning from next-pwa's webpack config injection
+  turbopack: {},
 }
 
 export default withPWA({

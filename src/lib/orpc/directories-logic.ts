@@ -1,6 +1,7 @@
 import { ORPCError } from '@orpc/server'
 import { stat, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import type { Dirent } from 'node:fs'
 
 export async function browseDirectory(
   path: string,
@@ -26,9 +27,9 @@ export async function browseDirectory(
     throw new ORPCError('BAD_REQUEST', { message: `Path is not a directory: ${path}` })
   }
 
-  let entries: Awaited<ReturnType<typeof readdir>>
+  let entries: Dirent<string>[]
   try {
-    entries = await readdir(resolvedPath, { withFileTypes: true })
+    entries = await readdir(resolvedPath, { withFileTypes: true }) as Dirent<string>[]
   } catch {
     throw new ORPCError('FORBIDDEN', { message: `Cannot read directory: ${path}` })
   }
