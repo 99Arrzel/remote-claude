@@ -88,7 +88,8 @@ export async function deleteSession(id: string, db: Db, manager: typeof ptyManag
   const entry = manager.get(id)
   if (entry) {
     entry.pty.kill()
-    manager.delete(id)
+    // Do NOT call manager.delete(id) here — onExit handler will clean up and publish the exit event
+    // so active stream subscribers receive the exit sentinel and can close cleanly.
   }
   await db.update(sessions).set({ status: 'killed', updatedAt: Date.now() }).where(eq(sessions.id, id))
 }
