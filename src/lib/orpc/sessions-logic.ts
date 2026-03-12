@@ -8,7 +8,7 @@ import { ptyManager, sessionPublisher, type SessionEvent } from '../pty/manager'
 type Db = ReturnType<typeof getDb>
 
 export async function createSession(
-  input: { name: string; cwd: string; resume?: boolean },
+  input: { name: string; cwd: string; claudeSessionId?: string; resume?: boolean },
   db: Db,
   manager: typeof ptyManager,
 ): Promise<Session> {
@@ -24,7 +24,9 @@ export async function createSession(
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const nodePty = require('node-pty') as typeof import('node-pty')
   let ptyProcess: ReturnType<typeof nodePty.spawn>
-  const args = input.resume ? ['--continue'] : []
+  const args = input.claudeSessionId
+    ? ['--resume', input.claudeSessionId]
+    : input.resume ? ['--continue'] : []
   try {
     ptyProcess = nodePty.spawn('claude', args, {
       name: 'xterm-256color',
@@ -40,7 +42,8 @@ export async function createSession(
   // 3. Insert DB row only after successful spawn
   const id = crypto.randomUUID()
   const now = Date.now()
-  await db.insert(sessions).values({ id, name: input.name, cwd: input.cwd, status: 'active', createdAt: now, updatedAt: now })
+  const claudeSessionId = input.claudeSessionId ?? null
+  await db.insert(sessions).values({ id, name: input.name, cwd: input.cwd, status: 'active', claudeSessionId, createdAt: now, updatedAt: now })
 
   // 4. Track in manager
   manager.set(id, { pty: ptyProcess, seq: 0 })
@@ -70,7 +73,7 @@ export async function createSession(
     sessionPublisher.publish(id, { type: 'exit', seq, data: '' })
   })
 
-  return { id, name: input.name, cwd: input.cwd, status: 'active', createdAt: now, updatedAt: now }
+  return { id, name: input.name, cwd: input.cwd, status: 'active', claudeSessionId, createdAt: now, updatedAt: now }
 }
 
 export async function getSession(id: string, db: Db): Promise<Session> {

@@ -9,7 +9,7 @@ import {
 
 export const sessionsRouter = os.router({
   create: os
-    .input(type({ name: 'string', cwd: 'string', 'resume?': 'boolean' }))
+    .input(type({ name: 'string', cwd: 'string', 'claudeSessionId?': 'string', 'resume?': 'boolean' }))
     .handler(async ({ input }) => createSession(input, getDb(), ptyManager)),
 
   get: os
