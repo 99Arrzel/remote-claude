@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { orpcClient } from '@/lib/orpc/client'
 import type { Session } from '@/lib/db/schema'
 
 function timeAgo(ms: number): string {
@@ -19,10 +21,27 @@ const STATUS_STYLES: Record<Session['status'], string> = {
 
 export function SessionCard({ session }: { session: Session }) {
   const router = useRouter()
+  const [resuming, setResuming] = useState(false)
+
+  async function handleResume(e: React.MouseEvent) {
+    e.stopPropagation()
+    setResuming(true)
+    try {
+      const newSession = await orpcClient.sessions.create({
+        name: session.name,
+        cwd: session.cwd,
+        resume: true,
+      })
+      router.push(`/sessions/${newSession.id}`)
+    } catch {
+      setResuming(false)
+    }
+  }
+
   return (
-    <button
+    <div
       onClick={() => router.push(`/sessions/${session.id}`)}
-      className="w-full text-left bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-4 transition-colors"
+      className="w-full text-left bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-4 transition-colors cursor-pointer"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="font-medium text-zinc-50 truncate">{session.name}</span>
@@ -33,10 +52,19 @@ export function SessionCard({ session }: { session: Session }) {
           <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_STYLES[session.status]}`}>
             {session.status}
           </span>
+          {session.status !== 'active' && (
+            <button
+              onClick={handleResume}
+              disabled={resuming}
+              className="text-xs px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
+            >
+              {resuming ? '…' : 'Resume'}
+            </button>
+          )}
         </div>
       </div>
       <p className="text-xs text-zinc-500 truncate font-mono">{session.cwd}</p>
       <p className="text-xs text-zinc-600 mt-1">{timeAgo(session.updatedAt)}</p>
-    </button>
+    </div>
   )
 }

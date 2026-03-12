@@ -8,7 +8,7 @@ import { ptyManager, sessionPublisher, type SessionEvent } from '../pty/manager'
 type Db = ReturnType<typeof getDb>
 
 export async function createSession(
-  input: { name: string; cwd: string },
+  input: { name: string; cwd: string; resume?: boolean },
   db: Db,
   manager: typeof ptyManager,
 ): Promise<Session> {
@@ -24,8 +24,9 @@ export async function createSession(
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const nodePty = require('node-pty') as typeof import('node-pty')
   let ptyProcess: ReturnType<typeof nodePty.spawn>
+  const args = input.resume ? ['--continue'] : []
   try {
-    ptyProcess = nodePty.spawn('claude', [], {
+    ptyProcess = nodePty.spawn('claude', args, {
       name: 'xterm-256color',
       cols: 220,
       rows: 50,

@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "bun ./node_modules/next/dist/bin/next dev",
     "build": "next build",
+    "prod": "next build && bun ./node_modules/next/dist/bin/next start",
     "start": "bun ./node_modules/next/dist/bin/next start",
     "db:migrate": "bun src/lib/db/migrate.ts",
     "db:generate": "bun drizzle-kit generate"
@@ -40,6 +41,7 @@
     "unrs-resolver"
   ],
   "trustedDependencies": [
+    "node-pty",
     "sharp",
     "unrs-resolver"
   ]
