@@ -6,7 +6,7 @@ import { orpcClient } from '@/lib/orpc/client'
 interface CreateDialogProps {
   initialHome: string
   onClose: () => void
-  onCreated: () => void
+  onCreated: (id: string) => void
 }
 
 export function CreateSessionDialog({ initialHome, onClose, onCreated }: CreateDialogProps) {
@@ -34,8 +34,8 @@ export function CreateSessionDialog({ initialHome, onClose, onCreated }: CreateD
     setLoading(true)
     setError('')
     try {
-      await orpcClient.sessions.create({ name: name.trim(), cwd: currentPath })
-      onCreated()
+      const session = await orpcClient.sessions.create({ name: name.trim(), cwd: currentPath })
+      onCreated(session.id)
     } catch (err: any) {
       setError(err.message ?? 'Failed to create session')
       setLoading(false)

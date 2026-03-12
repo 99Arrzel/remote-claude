@@ -1,1 +1,0 @@
-ALTER TABLE `sessions` ADD `claude_session_id` text;

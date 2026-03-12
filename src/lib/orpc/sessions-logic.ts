@@ -1,11 +1,49 @@
 import { ORPCError, withEventMeta } from '@orpc/server'
 import { stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { eq, desc, asc, and, gte } from 'drizzle-orm'
 import { sessions, sessionOutput, type Session } from '../db/schema'
 import type { getDb } from '../db'
-import { ptyManager, sessionPublisher, type SessionEvent } from '../pty/manager'
+import { ptyManager, sessionPublisher, type SessionEvent, type PtyHandle } from '../pty/manager'
 
 type Db = ReturnType<typeof getDb>
+
+export function buildPtyEnv(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => k !== 'CLAUDECODE')
+  ) as Record<string, string>
+}
+
+/** Spawn claude via a Node.js bridge process (Bun + node-pty is broken: SIGHUP + no onData). */
+function spawnBridge(cmd: string, args: string[], opts: { cwd: string; cols: number; rows: number }): PtyHandle {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { spawn } = require('child_process') as typeof import('child_process')
+  const bridgePath = join(process.cwd(), 'src', 'lib', 'pty', 'bridge.mjs')
+  const child = spawn('node', [bridgePath], {
+    env: {
+      ...buildPtyEnv(),
+      PTY_CMD: cmd,
+      PTY_ARGS: JSON.stringify(args),
+      PTY_CWD: opts.cwd,
+      PTY_COLS: String(opts.cols),
+      PTY_ROWS: String(opts.rows),
+    },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+  return {
+    write(data: string) { child.stdin.write(data) },
+    resize(cols: number, rows: number) {
+      child.stdin.write('\x00' + JSON.stringify({ type: 'resize', cols, rows }) + '\n')
+    },
+    kill() { child.kill() },
+    onData(cb: (data: string) => void) {
+      child.stdout.on('data', (buf: Buffer) => cb(buf.toString()))
+    },
+    onExit(cb: (e: { exitCode: number }) => void) {
+      child.on('exit', (code: number | null) => cb({ exitCode: code ?? 0 }))
+    },
+  }
+}
 
 export async function createSession(
   input: { name: string; cwd: string; claudeSessionId?: string; resume?: boolean },
@@ -20,21 +58,13 @@ export async function createSession(
     throw new ORPCError('BAD_REQUEST', { message: `cwd is not a valid directory: ${input.cwd}` })
   }
 
-  // 2. Spawn PTY
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const nodePty = require('node-pty') as typeof import('node-pty')
-  let ptyProcess: ReturnType<typeof nodePty.spawn>
+  // 2. Spawn PTY via Node.js bridge
+  let ptyProcess: PtyHandle
   const args = input.claudeSessionId
     ? ['--resume', input.claudeSessionId]
     : input.resume ? ['--continue'] : []
   try {
-    ptyProcess = nodePty.spawn('claude', args, {
-      name: 'xterm-256color',
-      cols: 220,
-      rows: 50,
-      cwd: input.cwd,
-      env: process.env as Record<string, string>,
-    })
+    ptyProcess = spawnBridge('claude', args, { cwd: input.cwd, cols: 220, rows: 50 })
   } catch (err) {
     throw new ORPCError('INTERNAL_SERVER_ERROR', { message: 'Failed to spawn claude', cause: err })
   }
@@ -50,7 +80,8 @@ export async function createSession(
 
   // 5. onData: write to DB synchronously THEN publish
   ptyProcess.onData((data) => {
-    const seq = manager.incrementSeq(id)
+    let seq: number
+    try { seq = manager.incrementSeq(id) } catch { return }
     db.insert(sessionOutput)
       .values({ sessionId: id, seq, type: 'output', data, createdAt: Date.now() })
       .run()

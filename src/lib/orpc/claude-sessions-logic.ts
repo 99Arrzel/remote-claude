@@ -7,11 +7,17 @@ export interface ClaudeSession {
   cwd: string
   summary: string | null
   gitBranch: string | null
+  model: string | null
+  totalTokens: number | null
   updatedAt: number
 }
 
-export async function listClaudeSessions(): Promise<ClaudeSession[]> {
-  const projectsDir = join(homedir(), '.claude', 'projects')
+export async function listClaudeSessions(projectsDir?: string): Promise<ClaudeSession[]> {
+  const dir = projectsDir ?? join(homedir(), '.claude', 'projects')
+  return listClaudeSessionsFromDir(dir)
+}
+
+async function listClaudeSessionsFromDir(projectsDir: string): Promise<ClaudeSession[]> {
   const sessions: ClaudeSession[] = []
 
   let projectDirs: string[]
@@ -46,6 +52,8 @@ export async function listClaudeSessions(): Promise<ClaudeSession[]> {
       let cwd: string | null = null
       let summary: string | null = null
       let gitBranch: string | null = null
+      let model: string | null = null
+      let totalTokens: number | null = null
 
       try {
         const content = await readFile(filePath, 'utf-8')
@@ -70,7 +78,19 @@ export async function listClaudeSessions(): Promise<ClaudeSession[]> {
                 }
               }
             }
-            if (cwd && summary) break
+            // Track latest assistant message for model + usage
+            if (d.type === 'assistant') {
+              const msg = d.message
+              if (msg?.model) model = msg.model
+              if (msg?.usage) {
+                const u = msg.usage
+                totalTokens =
+                  (u.input_tokens ?? 0) +
+                  (u.cache_creation_input_tokens ?? 0) +
+                  (u.cache_read_input_tokens ?? 0) +
+                  (u.output_tokens ?? 0)
+              }
+            }
           } catch {
             // skip malformed lines
           }
@@ -80,7 +100,7 @@ export async function listClaudeSessions(): Promise<ClaudeSession[]> {
       }
 
       if (!cwd) return
-      sessions.push({ id: sessionId, cwd, summary, gitBranch, updatedAt: mtime })
+      sessions.push({ id: sessionId, cwd, summary, gitBranch, model, totalTokens, updatedAt: mtime })
     }))
   }))
 

@@ -1,8 +1,15 @@
-import type { IPty } from 'node-pty'
 import { EventPublisher } from '@orpc/server'
 
+export interface PtyHandle {
+  write(data: string): void
+  resize(cols: number, rows: number): void
+  kill(): void
+  onData(cb: (data: string) => void): void
+  onExit(cb: (e: { exitCode: number }) => void): void
+}
+
 export interface PtyEntry {
-  pty: IPty
+  pty: PtyHandle
   seq: number
 }
 
