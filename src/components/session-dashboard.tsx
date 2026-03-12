@@ -160,7 +160,7 @@ export function SessionDashboard({ initialHome }: { initialHome: string }) {
 
   useEffect(() => {
     fetchSessions()
-    const interval = setInterval(fetchSessions, 5000)
+    const interval = setInterval(fetchSessions, 30_000)
     window.addEventListener('focus', fetchSessions)
     return () => {
       clearInterval(interval)
