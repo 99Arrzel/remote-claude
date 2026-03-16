@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun ./node_modules/next/dist/bin/next dev",
+    "dev": "bun ./node_modules/next/dist/bin/next dev -p 8888",
     "build": "next build",
-    "prod": "next build && bun ./node_modules/next/dist/bin/next start",
-    "start": "bun ./node_modules/next/dist/bin/next start",
+    "prod": "next build && bun ./node_modules/next/dist/bin/next start -p 8888",
+    "start": "bun ./node_modules/next/dist/bin/next start -p 8888",
     "db:migrate": "bun src/lib/db/migrate.ts",
     "db:generate": "bun drizzle-kit generate"
   },
