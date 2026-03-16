@@ -8,17 +8,19 @@ import { ptyManager, sessionPublisher, type SessionEvent, type PtyHandle, trackS
 
 type Db = ReturnType<typeof getDb>
 
-export function buildPtyEnv(): Record<string, string> {
+export function buildPtyEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(
     Object.entries(process.env).filter(([k]) => k !== 'CLAUDECODE')
-  ) as Record<string, string>
+  ) as NodeJS.ProcessEnv
 }
 
 /** Spawn claude via a Node.js bridge process (Bun + node-pty is broken: SIGHUP + no onData). */
 function spawnBridge(cmd: string, args: string[], opts: { cwd: string; cols: number; rows: number }): PtyHandle {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { spawn } = require('child_process') as typeof import('child_process')
-  const bridgePath = join(process.cwd(), 'src', 'lib', 'pty', 'bridge.mjs')
+  // Path segments split to prevent Turbopack from resolving as a module import
+  const ext = '.mjs'
+  const bridgePath = [process.cwd(), 'src', 'lib', 'pty', `bridge${ext}`].join('/')
   const child = spawn('node', [bridgePath], {
     env: {
       ...buildPtyEnv(),
